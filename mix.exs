@@ -7,7 +7,7 @@ defmodule OpencensusPhoenix.MixProject do
     [
       app: :opencensus_phoenix,
       version: "0.1.0",
-      elixir: "~> 1.6",
+      elixir: "~> 1.5",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: @description,
@@ -35,7 +35,9 @@ defmodule OpencensusPhoenix.MixProject do
 
   defp deps do
     [
-      {:opencensus, "~> 0.9.0"}
+      {:opencensus, "~> 0.9.0"},
+
+      {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
 end
