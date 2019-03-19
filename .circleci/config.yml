@@ -1,0 +1,58 @@
+# Elixir CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-elixir/ for more details
+version: 2.1
+
+commands:
+  fetch_deps:
+    description: "Fetch deps, build, and cache them"
+    parameters:
+      elixir_version:
+        type: string
+        default: "any"
+    steps:
+      - restore_cache:
+          keys:
+            - deps-v1-<<parameters.elixir_version>>-{{ checksum "mix.lock" }}-{{ .Branch }}-{{ .Revision }}
+            - deps-v1-<<parameters.elixir_version>>-{{ checksum "mix.lock" }}-{{ .Branch }}-
+            - deps-v1-<<parameters.elixir_version>>-{{ checksum "mix.lock" }}-
+            - deps-v1-<<parameters.elixir_version>>-
+      - run: mix do local.hex --force, local.rebar --force
+      - run: mix do deps.get, deps.compile
+      - save_cache:
+          key: deps-v1-{{ .Branch }}-{{ .Revision }}
+          paths:
+            - "deps"
+            - "_build"
+
+jobs:
+  test:
+    parameters:
+      elixir_version:
+        type: string
+        description: Elixir version to test against
+    docker:
+      - image: elixir:<<parameters.elixir_version>>
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - fetch_deps:
+          elixir_version: <<parameters.elixir_version>>
+      - run: mix test
+
+workflows:
+  version: 2
+  testing:
+    jobs:
+      - test:
+          name: "Elixir 1.8"
+          elixir_version: "1.8"
+      - test:
+          name: "Elixir 1.7"
+          elixir_version: "1.7"
+      - test:
+          name: "Elixir 1.6"
+          elixir_version: "1.6"
+      - test:
+          name: "Elixir 1.5"
+          elixir_version: "1.5"
