@@ -15,7 +15,11 @@ defmodule OpencensusPhoenix.Instrumenter do
 
   @doc false
   def phoenix_controller_call(:start, _compiled_meta, %{conn: conn}) do
-    parent_span_ctx = :oc_propagation_http_tracecontext.from_headers(conn.req_headers)
+    parent_span_ctx =
+      Map.get_lazy(conn.private, :opencensus_span_ctx, fn ->
+        :oc_propagation_http_tracecontext.from_headers(conn.req_headers)
+      end)
+
     :ocp.with_span_ctx(parent_span_ctx)
 
     user_agent =
@@ -28,16 +32,14 @@ defmodule OpencensusPhoenix.Instrumenter do
       "http.method" => conn.method,
       "http.path" => conn.request_path,
       "http.user_agent" => user_agent,
-      "http.url" => Plug.Conn.request_url(conn)
-
+      "http.url" => Plug.Conn.request_url(conn),
+      "phoenix.controller" => Phoenix.Controller.controller_module(conn),
+      "phoenix.action" => Phoenix.Controller.action_name(conn)
       # TODO: How do we get this?
-      # "http.route" => "",
-
-      # TODO: this has to be set after the request is finished but
-      # there is currently no way to do that here.
-      # "http.status_code" => ""
+      # "http.route" => ""
     }
 
+    # TODO: Use route as span name
     :ocp.with_child_span(span_name(conn), attributes)
     span_ctx = :ocp.current_span_ctx()
 
@@ -67,6 +69,7 @@ defmodule OpencensusPhoenix.Instrumenter do
 
   ## PRIVATE
 
+  # TODO: Move this to opencensus_elixir so the plug and phoenix apps can share
   require Record
 
   Record.defrecordp(
