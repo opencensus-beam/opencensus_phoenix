@@ -58,6 +58,35 @@ defmodule OpencensusPhoenix.Instrumenter do
     :ocp.with_span_ctx(parent_span_ctx)
   end
 
+  @doc false
+  def phoenix_controller_render(:start, _compiled_meta, meta) do
+    %{conn: conn, view: view, template: template, format: format} = meta
+
+    parent_span_ctx =
+      Map.get_lazy(conn.private, :opencensus_span_ctx, fn ->
+        :oc_propagation_http_tracecontext.from_headers(conn.req_headers)
+      end)
+
+    attributes = %{
+      "phoenix.view" => view,
+      "phoenix.template" => template,
+      "phoenix.format" => format
+    }
+
+    :ocp.with_child_span(view, attributes)
+    span_ctx = :ocp.current_span_ctx()
+
+    :ok = unquote(__MODULE__).set_logger_metadata(span_ctx)
+
+    {span_ctx, parent_span_ctx}
+  end
+
+  @doc false
+  def phoenix_controller_render(:stop, _time_diff, {span_ctx, parent_span_ctx}) do
+    :oc_trace.finish_span(span_ctx)
+    :ocp.with_span_ctx(parent_span_ctx)
+  end
+
   def span_name(conn) do
     controller = Phoenix.Controller.controller_module(conn)
     action = Phoenix.Controller.action_name(conn)
