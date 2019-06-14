@@ -12,3 +12,10 @@ config :my_app, MyAppWeb.Endpoint,
   # ... existing config ...
   instrumenters: [OpencensusPhoenix.Instrumenter]
 ```
+
+# Resource Names
+
+Prior to Phoenix 1.4, the "route info" was not available to plugs. As such instead of using the http route as the resource name, we use the controller + action combination. For example:
+
+* Pre 1.4: `MyApp.Posts.index`
+* Version 1.4 or greater: `/posts`
