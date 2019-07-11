@@ -27,6 +27,8 @@ defmodule OpencensusPhoenix.Instrumenter do
       |> Plug.Conn.get_req_header("user-agent")
       |> List.first()
 
+    route_info = route_info(conn)
+
     attributes = %{
       "http.host" => conn.host,
       "http.method" => conn.method,
@@ -34,13 +36,14 @@ defmodule OpencensusPhoenix.Instrumenter do
       "http.user_agent" => user_agent,
       "http.url" => Plug.Conn.request_url(conn),
       "phoenix.controller" => Phoenix.Controller.controller_module(conn),
-      "phoenix.action" => Phoenix.Controller.action_name(conn)
-      # TODO: How do we get this?
-      # "http.route" => ""
+      "phoenix.action" => Phoenix.Controller.action_name(conn),
+      "http.route" => route_info[:route] || ""
     }
 
-    # TODO: Use route as span name
-    :ocp.with_child_span(span_name(conn), attributes)
+    conn
+    |> span_name(route_info)
+    |> :ocp.with_child_span(attributes)
+
     span_ctx = :ocp.current_span_ctx()
 
     :ok = unquote(__MODULE__).set_logger_metadata(span_ctx)
@@ -87,10 +90,41 @@ defmodule OpencensusPhoenix.Instrumenter do
     :ocp.with_span_ctx(parent_span_ctx)
   end
 
-  def span_name(conn) do
+  defp span_name(conn, _) do
+    controller_action(conn)
+  end
+
+  defp controller_action(conn) do
     controller = Phoenix.Controller.controller_module(conn)
     action = Phoenix.Controller.action_name(conn)
     "#{controller}.#{action}"
+  end
+
+  # Version 1.4 or higher
+  phoenix_version_supports_route_info? =
+    Code.ensure_compiled?(Phoenix.Router) &&
+      :erlang.function_exported(Phoenix.Router, :route_info, 4)
+
+  if phoenix_version_supports_route_info? do
+    defp span_name(_conn, %{route: route}) do
+      route
+    end
+  else
+    defp span_name(conn, _) do
+      controller_action(conn)
+    end
+  end
+
+  if phoenix_version_supports_route_info? do
+    defp route_info(%{method: method, request_path: request_path, host: host} = conn) do
+      router = conn.private[:phoenix_router]
+
+      Phoenix.Router.route_info(router, method, request_path, host)
+    end
+  else
+    defp route_info(_) do
+      nil
+    end
   end
 
   def span_status(conn, _opts),
