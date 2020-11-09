@@ -90,10 +90,6 @@ defmodule OpencensusPhoenix.Instrumenter do
     :ocp.with_span_ctx(parent_span_ctx)
   end
 
-  defp span_name(conn, _) do
-    controller_action(conn)
-  end
-
   defp controller_action(conn) do
     controller = Phoenix.Controller.controller_module(conn)
     action = Phoenix.Controller.action_name(conn)
@@ -109,10 +105,10 @@ defmodule OpencensusPhoenix.Instrumenter do
     defp span_name(_conn, %{route: route}) do
       route
     end
-  else
-    defp span_name(conn, _) do
-      controller_action(conn)
-    end
+  end
+
+  defp span_name(conn, _) do
+    controller_action(conn)
   end
 
   if phoenix_version_supports_route_info? do
